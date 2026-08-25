@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { contact, site } from "@/lib/content";
 import { saveLead } from "@/lib/leads";
+import { sendAuditRequestEmail } from "@/lib/notify";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const LIMITS = { name: 200, email: 200, instagram: 80, message: 5000 } as const;
-/** Below `maxDuration`, so a hung provider still hits the friendly error. */
-const SEND_TIMEOUT_MS = 10_000;
 
 /**
  * Best-effort throttle. Serverless instances do not share this map, so it is
@@ -32,7 +31,7 @@ function overLimit(key: string): boolean {
 
 /**
  * Counts one attempt. Called only once a submission has passed validation and
- * is about to be sent: counting rejected submissions instead meant someone
+ * is about to be stored: counting rejected submissions instead meant someone
  * fixing two typos spent three of their five attempts and got locked out of
  * the form mid-correction.
  */
@@ -53,8 +52,8 @@ function recordAttempt(key: string): void {
 /**
  * People paste a profile URL as often as they type a handle, and the field's
  * decorative "@" prefix does not stop them. Left alone,
- * "https://instagram.com/name" survived every check and produced the subject
- * "(@https://instagram.com/name)" and a doubly-nested dead link.
+ * "https://instagram.com/name" survived every check and was stored verbatim,
+ * so the handle you audit against would not resolve.
  * Normalising beats rejecting here: a 422 turns a salvageable lead away.
  */
 function normalizeHandle(raw: string): string {
@@ -71,7 +70,6 @@ function clamp(value: unknown, max: number): string {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
-/** HTML only. The plain-text alternative must NOT be escaped. */
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -83,8 +81,8 @@ function escapeHtml(value: string): string {
 
 /**
  * Errors name `site.email` — the address already printed on the page — never
- * `CONTACT_TO_EMAIL`. Those can differ, and the env one is not something an
- * anonymous caller should be able to read back out of a failure response.
+ * `CONTACT_TO_EMAIL`. The two can differ, and an environment value is not
+ * something an anonymous caller should be able to read out of a failure.
  */
 function fail(status: number, error: string) {
   return NextResponse.json({ error }, { status });
@@ -136,7 +134,7 @@ export async function POST(request: Request) {
   // ContactSection.tsx for why it must never be called "company".
   if (clamp(body.ts_hp, 200).length > 0) {
     return isFormPost
-      ? htmlReply(200, "Message sent", "Thanks — I have got it.")
+      ? htmlReply(200, contact.successTitle.replace(/\.$/, ""), contact.successBody)
       : NextResponse.json({ ok: true });
   }
 
@@ -169,101 +167,57 @@ export async function POST(request: Request) {
   }
   const message = rawMessage;
 
-  // Valid and about to be sent — now it counts against the window.
+  // Valid and about to be stored — now it counts against the window.
   recordAttempt(ip);
 
-  // Persist BEFORE emailing, and never let the result change the response.
-  // Order matters: writing first means an email outage cannot lose the lead,
-  // because the row already exists. The reverse — a database outage — cannot
-  // cost the email either, because nothing below branches on `saved`.
-  const saved = await saveLead({ name, email, instagram, message });
-  if (saved === "failed") {
+  /**
+   * Two independent captures, in PARALLEL — the database row is the durable
+   * record, the email is the immediate ping. Neither waits on the other, so
+   * "right away" stays right away rather than costing two round trips.
+   *
+   * ⚠️ The success rule is: DID THE LEAD SURVIVE ANYWHERE? Not "did everything
+   * work". Insisting on both would turn a Resend blip into a failure message
+   * for an enquiry that is sitting safely in the table — pushing the visitor
+   * to send a duplicate and making a working site look broken. Insisting on
+   * neither would let a total outage swallow an enquiry while saying "Got it",
+   * which is the one outcome that must never happen.
+   *
+   * Neither helper throws; both catch and report a status.
+   */
+  const [saved, emailed] = await Promise.all([
+    saveLead({ name, email, instagram, message }),
+    sendAuditRequestEmail({ name, email, instagram, message }),
+  ]);
+
+  if (saved !== "saved") {
     console.error(
-      "[contact] Lead was NOT stored; the email below is the only copy.",
+      `[contact] NOT stored (${saved}). Email status: ${emailed}.`,
+      saved === "unconfigured"
+        ? "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+        : "",
     );
-  } else if (saved === "unconfigured") {
-    // Warn per submission rather than once per cold start. At this site's
-    // volume that is a handful of lines a day, and "leads are not being
-    // stored" is exactly the condition you want noisy rather than tidy.
-    console.warn(
-      "[contact] Supabase is not configured; the email is the only copy of this lead.",
+  }
+  if (emailed !== "sent") {
+    console.error(
+      `[contact] NOT emailed (${emailed}). Stored status: ${saved}.`,
+      emailed === "unconfigured"
+        ? "Set RESEND_API_KEY, CONTACT_FROM_EMAIL and CONTACT_TO_EMAIL."
+        : "",
     );
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.CONTACT_FROM_EMAIL;
-  const to = process.env.CONTACT_TO_EMAIL;
-
-  // `to` is checked HERE, not defaulted to site.email. Falling back meant that
-  // with a key and a from-address configured but this one missing, enquiries
-  // were delivered to whatever placeholder was sitting in content.ts — a
-  // domain the owner may not even control — and everything reported success.
-  if (!apiKey || !from || !to) {
+  // Both failed: nothing captured this enquiry anywhere. Say so.
+  if (saved !== "saved" && emailed !== "sent") {
     console.error(
-      "[contact] Email delivery is not configured. Need RESEND_API_KEY, CONTACT_FROM_EMAIL and CONTACT_TO_EMAIL.",
+      "[contact] THIS ENQUIRY WAS LOST — neither the database nor the email accepted it.",
     );
     return reject(
-      503,
-      `The form is not connected to an inbox yet. Please email ${site.email} directly.`,
+      saved === "unconfigured" && emailed === "unconfigured" ? 503 : 502,
+      `That did not go through. Please email ${site.email} directly.`,
     );
-  }
-
-  const subject = `Audit request — ${name} (@${instagram})`;
-  const text = [
-    `Name: ${name}`,
-    `Email: ${email}`,
-    `Instagram: https://instagram.com/${instagram}`,
-    "",
-    "About their audience:",
-    message,
-  ].join("\n");
-
-  const handleRow = `<tr><td style="padding:8px 0;font-size:13px;color:#8b8d94">Instagram</td>
-        <td style="padding:8px 0;font-size:14px"><a href="https://instagram.com/${encodeURIComponent(instagram)}" style="color:#c6ff4d;text-decoration:none">@${escapeHtml(instagram)}</a></td></tr>`;
-
-  const html = `<!doctype html><html><body style="margin:0;background:#0b0d12;padding:32px 16px;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#171a21;border:1px solid #1f232c">
-<tr><td style="padding:28px 28px 8px">
-  <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#8b8d94">Audit request</div>
-  <div style="margin-top:10px;font-size:22px;font-weight:600;color:#f5f3ee">${escapeHtml(name)}</div>
-</td></tr>
-<tr><td style="padding:12px 28px">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-    <tr><td style="padding:8px 0;font-size:13px;color:#8b8d94;width:110px">Email</td>
-        <td style="padding:8px 0;font-size:14px"><a href="mailto:${escapeHtml(email)}" style="color:#c6ff4d;text-decoration:none">${escapeHtml(email)}</a></td></tr>
-    ${handleRow}
-  </table>
-</td></tr>
-<tr><td style="padding:8px 28px 28px">
-  <div style="border-top:1px solid #1f232c;padding-top:18px;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#8b8d94">About their audience</div>
-  <div style="margin-top:12px;font-size:15px;line-height:1.65;color:#f5f3ee;white-space:pre-wrap">${escapeHtml(message)}</div>
-</td></tr>
-</table>
-</body></html>`;
-
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from, to, reply_to: email, subject, text, html }),
-      // Without this a hung provider runs out the whole function budget and
-      // the caller gets a platform timeout instead of the friendly fallback.
-      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
-    });
-
-    if (!res.ok) {
-      console.error("[contact] Resend rejected the send:", res.status, await res.text());
-      return reject(502, `That did not send. Please email ${site.email} directly.`);
-    }
-  } catch (error) {
-    console.error("[contact] Send failed:", error);
-    return reject(502, `That did not send. Please email ${site.email} directly.`);
   }
 
   return isFormPost
-    ? htmlReply(200, contact.successTitle.replace(/.$/, ""), contact.successBody)
+    ? htmlReply(200, contact.successTitle.replace(/\.$/, ""), contact.successBody)
     : NextResponse.json({ ok: true });
 }

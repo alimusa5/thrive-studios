@@ -16,19 +16,21 @@ Then open http://localhost:3000.
 
 ## Before you go live
 
-Your contact details are in. Two things are still assumptions:
-
 | What | Where | Currently |
 | --- | --- | --- |
+| Lead storage | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | not connected |
+| Email notification | `RESEND_API_KEY` + `CONTACT_TO_EMAIL` + `CONTACT_FROM_EMAIL` | not connected |
 | Your live domain | `NEXT_PUBLIC_SITE_URL`, or `site.url` in `lib/content.ts` | assumed `https://thrivestudios.io` from the .io email — change it if the site lives elsewhere |
-| Contact form delivery | env vars — see below | not connected; the form says so honestly |
-| Lead storage | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | not connected; enquiries arrive by email only |
 
-Until the form is connected it does **not** fail silently: it returns a 503 and
-the page tells the visitor to email `aonraza@thrivestudios.io` directly, with a
-working `mailto:` link.
+Every submission is captured **twice**: a row in Supabase and an email to you.
+Set both up — but note the form keeps working on either one alone, so you can
+ship with one configured and add the other later.
+
+With neither connected the form does **not** fail silently: it returns a 503
+and tells the visitor to email `aonraza@thrivestudios.io` instead.
 
 ---
+
 
 ## Editing the copy
 
@@ -46,43 +48,57 @@ Two things to know:
 
 ---
 
-## Connecting the contact form
+## How a request reaches you
 
-The form posts to `/api/contact`, which sends through
-[Resend](https://resend.com). Set three environment variables:
+One submission, two independent captures, fired **in parallel** so neither
+waits on the other:
 
-```bash
-RESEND_API_KEY=re_xxxxxxxx
-CONTACT_TO_EMAIL=aonraza@thrivestudios.io
-CONTACT_FROM_EMAIL="Thrive Studios <hello@thrivestudios.io>"
+```
+                          ┌─→ INSERT into Supabase   (the durable record)
+form → POST /api/contact ─┤
+                          └─→ Resend → your inbox    (the immediate ping)
 ```
 
-Locally, put them in `.env.local` (copy `.env.example`). On Vercel, add them
-under **Settings → Environment Variables**, then redeploy.
+The email is titled *Audit request — Name (@handle)*, carries the handle as a
+clickable link, and sets **Reply-To to the sender** — so hitting reply reaches
+the creator, not yourself. It lands in Google Workspace like any other mail;
+Resend never becomes your mailbox, it only does the sending.
 
-**All three are required.** If any one is missing the form refuses to send and
-says so — it deliberately does *not* fall back to the address in
-`lib/content.ts`, because that would quietly deliver real enquiries to a
-placeholder domain while reporting success.
+The row is what you work from afterwards. Open the Supabase **Table Editor**,
+or run:
 
-`CONTACT_FROM_EMAIL` must be an address on a domain you have verified in
-Resend. Before your own domain is verified you can use
-`Thrive Studios <onboarding@resend.dev>` to test.
+```sql
+select created_at, name, email, instagram, message
+from audit_requests
+where status = 'new'
+order by created_at desc;
+```
 
-Enquiries arrive with **Reply-To set to the sender**, so you can just hit reply.
+### ⚠️ The success rule: did the lead survive *anywhere*?
 
-The route also handles: server-side re-validation, a honeypot (bots get a
-silent `200`), a per-IP rate limit of 5/minute, a 10s send timeout, refusal of
-over-long messages rather than silent truncation, and a **no-JavaScript
-fallback** — the form is a real `POST` to `/api/contact`, which answers a
-browser submit with a plain branded confirmation page. The rate limit is per
-serverless instance, so it is a speed bump rather than a guarantee; if the form
-ever gets seriously targeted, swap it for Vercel KV / Upstash.
+Not "did everything work". This is the part worth understanding before you
+change the route:
 
-⚠️ **The honeypot field's name must stay meaningless.** Calling it `company`
-with a `Company` label — the obvious choice — makes Chrome autofill it from a
-saved address profile, so a real person's enquiry trips the trap and is
-silently discarded. `autocomplete="off"` does not prevent this.
+| Supabase | Email | Visitor sees | Why |
+| --- | --- | --- | --- |
+| ✅ | ✅ | "Got it." | Normal. |
+| ✅ | ❌ | "Got it." | The lead is safe in the table. Failing here would push someone to send a duplicate and make a working site look broken. Logged loudly. |
+| ❌ | ✅ | "Got it." | You have the email. Nothing is lost. Logged loudly. |
+| ❌ | ❌ | 502 + `mailto:` | Nothing captured it. This is the one case that must never report success. |
+
+So a Resend outage costs you the *ping*, not the lead; a Supabase outage costs
+you the *record*, not the lead. Both would have to break together to lose
+anything, which is what the `mailto:` on the page is for.
+
+Every non-success is logged with the status of *both* sides and the exact env
+vars to set, so a half-configured deploy is obvious in the Vercel logs rather
+than silent.
+
+### Want a Slack or Discord ping too?
+
+No app change needed. In Supabase, **Database → Webhooks** fires on `INSERT`
+into `audit_requests` and can POST to an incoming webhook.
+
 
 ### Worth revisiting
 
@@ -99,6 +115,7 @@ silently discarded. `autocomplete="off"` does not prevent this.
   `contact.followUp` and `contact.successBody` in `lib/content.ts`.
 
 ---
+
 
 ## The contact section is a lead magnet
 
@@ -146,14 +163,9 @@ strangers' names, emails and what they told you about their business. The
 service-role key used by the route bypasses RLS, so inserts still work. Do not
 add a policy "so I can read it from the browser".
 
-**How it fails.** The row is written *before* the email, and nothing downstream
-branches on the result:
-
-| What breaks | What happens |
-| --- | --- |
-| Supabase down | Email still sends. Logged as `Lead was NOT stored`. |
-| Resend down | Row is already saved. Visitor is told to email you directly. |
-| Both | Visitor gets the `mailto:` fallback, which is why it is on the page. |
+**If this write fails**, the email still carries the lead and the visitor is
+told "Got it." — see *The success rule* above. It is only when both this and
+the email fail that a submission is refused.
 
 The status column tracks your funnel: `new → audit_sent → dm_sent →
 call_booked → client` (or `declined`). It is a CHECK constraint, so a typo is
@@ -164,27 +176,30 @@ in the schema if you add a status.**
 
 ## Deploying
 
-**1. Resend** — create the account, add `thrivestudios.io` as a domain, add the
+**1. Supabase** — create a project, run [`supabase/schema.sql`](supabase/schema.sql)
+in the SQL Editor, and copy the Project URL and `service_role` key.
+
+**1b. Resend** — create the account, add `thrivestudios.io` as a domain, add the
 DNS records it gives you at your registrar, then create an API key. You only
 need *sending*; the site never receives email. Until the domain verifies, ship
 with `Thrive Studios <onboarding@resend.dev>` as the sender.
 
-⚠️ If that domain already handles your mail, **merge** Resend's SPF record into
-your existing one rather than adding a second `v=spf1` TXT record — two SPF
-records on one domain is invalid and can break your own inbox.
+⚠️ **Your domain already handles your Google Workspace mail.** Resend will ask
+for an SPF record — **merge** it into your existing `v=spf1` record rather than
+adding a second one. Two SPF records on one domain is invalid and can break
+your own inbox. DKIM is a separate TXT record and adds cleanly alongside
+Google's; MX records are untouched either way.
 
 **2. Vercel** — import the repo at [vercel.com/new](https://vercel.com/new).
 Framework, build command and output all auto-detect. Add every variable from
 `.env.example` under **Settings → Environment Variables** before the first
 deploy.
 
-**3. Domain** — add it in Vercel and follow their DNS instructions. Vercel's
-records (A / CNAME) and Resend's (TXT / DKIM) are different record types and
-coexist fine at the same registrar.
+**3. Domain** — add it in Vercel and follow their DNS instructions.
 
 **4. Check it end to end** — submit the form as a visitor would. You should get
-an email titled *Audit request — Name (@handle)* with Reply-To set to them, and
-a matching row in the Supabase Table Editor.
+the email *and* see a matching row in the Supabase Table Editor. If only one
+arrives, the Vercel logs name which side failed and which variables to set.
 
 ⚠️ **`NEXT_PUBLIC_SITE_URL` is inlined at build time.** Add or change it after
 deploying and you must **redeploy**, or your canonical URL and social-card links
@@ -275,6 +290,9 @@ components/
   Reveal.tsx          scroll-triggered entrance
   Logo.tsx            the mark, drawn from the supplied geometry
 lib/content.ts        ALL copy
+lib/leads.ts          Supabase insert (server only)
+lib/notify.ts         Resend notification (server only)
+supabase/schema.sql   run this once in the SQL Editor
 ```
 
 ## Checks
