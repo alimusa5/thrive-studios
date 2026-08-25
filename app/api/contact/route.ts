@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { contact, site } from "@/lib/content";
 import { saveLead } from "@/lib/leads";
-import { sendAuditRequestEmail } from "@/lib/notify";
+import { sendAuditRequestEmail, sendAutoReply } from "@/lib/notify";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -216,6 +216,26 @@ export async function POST(request: Request) {
       `That did not go through. Please email ${site.email} directly.`,
     );
   }
+
+  /**
+   * The thank-you back to the sender, in `after()` — it runs once the response
+   * has been sent, so the visitor never waits on a courtesy email.
+   *
+   * Placed BELOW the failure return on purpose: an auto-reply promising an
+   * audit for a submission that was just refused would be worse than none.
+   * Nothing here can change what the visitor already saw.
+   */
+  after(async () => {
+    const replied = await sendAutoReply({ name, email, instagram, message });
+    if (replied !== "sent") {
+      console.error(
+        `[contact] Auto-reply NOT sent (${replied}) to ${email}.`,
+        replied === "unconfigured"
+          ? "Set RESEND_API_KEY, CONTACT_FROM_EMAIL and CONTACT_TO_EMAIL."
+          : "Note this one needs a VERIFIED Resend domain — onboarding@resend.dev only delivers to your own address.",
+      );
+    }
+  });
 
   return isFormPost
     ? htmlReply(200, contact.successTitle.replace(/\.$/, ""), contact.successBody)

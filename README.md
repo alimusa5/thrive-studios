@@ -50,14 +50,29 @@ Two things to know:
 
 ## How a request reaches you
 
-One submission, two independent captures, fired **in parallel** so neither
-waits on the other:
+One submission, three outcomes. The two **captures** fire in parallel so
+neither waits on the other; the thank-you goes out after the response:
 
 ```
                           ┌─→ INSERT into Supabase   (the durable record)
 form → POST /api/contact ─┤
                           └─→ Resend → your inbox    (the immediate ping)
+                                  │
+                                  └─ after() ─→ thank-you to the sender
 ```
+
+The thank-you runs inside Next's `after()`, so the visitor never waits on a
+courtesy email — and it sits **below** the failure return, so a refused
+submission can never trigger an auto-reply promising an audit. It greets them
+by first name, confirms the handle you will be auditing (with an invitation to
+correct it), lists the same three deliverables as the page, and sets
+**Reply-To to your inbox** so a reply reaches you rather than the sending
+address.
+
+⚠️ **The auto-reply needs a VERIFIED Resend domain.** It sends to a stranger's
+address, and `onboarding@resend.dev` only delivers to your own account email —
+so with the test sender configured, your notification arrives and the visitor's
+thank-you silently does not. It is logged when that happens.
 
 The email is titled *Audit request — Name (@handle)*, carries the handle as a
 clickable link, and sets **Reply-To to the sender** — so hitting reply reaches
@@ -291,7 +306,7 @@ components/
   Logo.tsx            the mark, drawn from the supplied geometry
 lib/content.ts        ALL copy
 lib/leads.ts          Supabase insert (server only)
-lib/notify.ts         Resend notification (server only)
+lib/notify.ts         Resend: your notification + the sender auto-reply (server only)
 supabase/schema.sql   run this once in the SQL Editor
 ```
 

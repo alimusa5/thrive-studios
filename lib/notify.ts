@@ -12,7 +12,7 @@
  * not justify a dependency, and it keeps the timeout explicit.
  */
 
-import { site } from "@/lib/content";
+import { contact, site } from "@/lib/content";
 
 export type Notification = {
   name: string;
@@ -116,6 +116,119 @@ export async function sendAuditRequestEmail(
     return "sent";
   } catch (error) {
     console.error("[notify] Send failed:", error);
+    return "failed";
+  }
+}
+
+/**
+ * The thank-you that goes back to the person who submitted.
+ *
+ * Sent from the route inside `after()`, so it never delays the visitor's
+ * response and only ever runs once the enquiry has actually been captured —
+ * an auto-reply promising an audit for a submission that failed would be
+ * worse than no auto-reply at all.
+ *
+ * ⚠️ This one sends to a STRANGER's address, which is the reason the Resend
+ * domain must be verified. The shared `onboarding@resend.dev` sender can only
+ * deliver to your own account address, so with it configured the owner
+ * notification arrives and this silently does not.
+ */
+export async function sendAutoReply(req: Notification): Promise<NotifyResult> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.CONTACT_FROM_EMAIL;
+  // Replies must reach a person, not the branded sending address.
+  const replyTo = process.env.CONTACT_TO_EMAIL;
+
+  if (!apiKey || !from || !replyTo) return "unconfigured";
+
+  const firstName = req.name.trim().split(/\s+/)[0] || req.name.trim();
+  const subject = `Your audience audit — ${site.name}`;
+
+  const text = [
+    `Thanks, ${firstName}.`,
+    "",
+    `I have got your request and I will go through @${req.instagram} myself.`,
+    "",
+    "What you get back:",
+    ...contact.deliverables.map((d) => `  - ${d}`),
+    "",
+    contact.followUp,
+    "",
+    `If @${req.instagram} is not the right account, just reply to this email and tell me.`,
+    "",
+    "— Aon",
+    site.name,
+  ].join("\n");
+
+  const bullets = contact.deliverables
+    .map(
+      (d) =>
+        `<tr>
+      <td valign="top" style="padding:0 10px 10px 0;width:14px">
+        <div style="width:5px;height:5px;background:#c6ff4d;transform:rotate(45deg);margin-top:8px"></div>
+      </td>
+      <td valign="top" style="padding:0 0 10px;font-size:15px;line-height:1.6;color:#f5f3ee">${escapeHtml(d)}</td>
+    </tr>`,
+    )
+    .join("");
+
+  const html = `<!doctype html><html><body style="margin:0;background:#0b0d12;padding:32px 16px;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">Your audience audit is on the way.</div>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#171a21;border:1px solid #1f232c">
+<tr><td style="padding:32px 28px 8px">
+  <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#8b8d94">Audience audit</div>
+  <div style="margin-top:12px;font-size:26px;font-weight:600;color:#f5f3ee">Thanks, ${escapeHtml(firstName)}.</div>
+  <div style="margin-top:14px;font-size:15px;line-height:1.65;color:#8b8d94">
+    I have got your request and I will go through
+    <a href="https://instagram.com/${encodeURIComponent(req.instagram)}" style="color:#c6ff4d;text-decoration:none">@${escapeHtml(req.instagram)}</a>
+    myself.
+  </div>
+</td></tr>
+<tr><td style="padding:20px 28px 4px">
+  <div style="border-top:1px solid #1f232c;padding-top:20px;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#8b8d94">${escapeHtml(contact.deliverablesTitle)}</div>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:16px">${bullets}</table>
+</td></tr>
+<tr><td style="padding:8px 28px 28px">
+  <div style="font-size:15px;line-height:1.65;color:#8b8d94">${escapeHtml(contact.followUp)}</div>
+  <div style="margin-top:20px;padding-top:18px;border-top:1px solid #1f232c;font-size:13px;line-height:1.6;color:#8b8d94">
+    Not the right account? Just reply to this email and tell me.
+  </div>
+  <div style="margin-top:20px;font-size:15px;line-height:1.6;color:#f5f3ee">— Aon<br>
+    <span style="color:#8b8d94">${escapeHtml(site.name)}</span>
+  </div>
+</td></tr>
+</table>
+</body></html>`;
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: req.email,
+        reply_to: replyTo,
+        subject,
+        text,
+        html,
+      }),
+      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+    });
+
+    if (!res.ok) {
+      console.error(
+        "[notify] Auto-reply rejected:",
+        res.status,
+        await res.text().catch(() => "(no body)"),
+      );
+      return "failed";
+    }
+    return "sent";
+  } catch (error) {
+    console.error("[notify] Auto-reply failed:", error);
     return "failed";
   }
 }
