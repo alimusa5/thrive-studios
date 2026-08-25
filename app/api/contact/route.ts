@@ -123,6 +123,9 @@ export async function POST(request: Request) {
   // the form, never for us.
   if (name.length < 2) return reject(422, "Please include your name.");
   if (!EMAIL.test(email)) return reject(422, "Please include a valid email address.");
+  // Required, unlike an ordinary contact form: without a handle there is no
+  // audience to audit and no second channel to follow up on.
+  if (instagram.length < 2) return reject(422, "Please include your Instagram handle.");
   if (rawMessage.length < 10) return reject(422, "Please include a little more detail.");
   // Refuse an over-long message rather than silently truncating it — a lead
   // that arrives with its last paragraph missing is worse than one told to
@@ -150,26 +153,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const handle = instagram.length >= 2 ? instagram : null;
-  const subject = `New enquiry — ${name}${handle ? ` (@${handle})` : ""}`;
+  const subject = `Audit request — ${name} (@${instagram})`;
   const text = [
     `Name: ${name}`,
     `Email: ${email}`,
-    `Instagram: ${handle ? `@${handle}` : "(not given)"}`,
+    `Instagram: https://instagram.com/${instagram}`,
     "",
-    "Current situation:",
+    "About their audience:",
     message,
   ].join("\n");
 
-  const handleRow = handle
-    ? `<tr><td style="padding:8px 0;font-size:13px;color:#8b8d94">Instagram</td>
-        <td style="padding:8px 0;font-size:14px"><a href="https://instagram.com/${encodeURIComponent(handle)}" style="color:#c6ff4d;text-decoration:none">@${escapeHtml(handle)}</a></td></tr>`
-    : "";
+  const handleRow = `<tr><td style="padding:8px 0;font-size:13px;color:#8b8d94">Instagram</td>
+        <td style="padding:8px 0;font-size:14px"><a href="https://instagram.com/${encodeURIComponent(instagram)}" style="color:#c6ff4d;text-decoration:none">@${escapeHtml(instagram)}</a></td></tr>`;
 
   const html = `<!doctype html><html><body style="margin:0;background:#0b0d12;padding:32px 16px;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#171a21;border:1px solid #1f232c">
 <tr><td style="padding:28px 28px 8px">
-  <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#8b8d94">New enquiry</div>
+  <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#8b8d94">Audit request</div>
   <div style="margin-top:10px;font-size:22px;font-weight:600;color:#f5f3ee">${escapeHtml(name)}</div>
 </td></tr>
 <tr><td style="padding:12px 28px">
@@ -180,7 +180,7 @@ export async function POST(request: Request) {
   </table>
 </td></tr>
 <tr><td style="padding:8px 28px 28px">
-  <div style="border-top:1px solid #1f232c;padding-top:18px;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#8b8d94">Current situation</div>
+  <div style="border-top:1px solid #1f232c;padding-top:18px;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#8b8d94">About their audience</div>
   <div style="margin-top:12px;font-size:15px;line-height:1.65;color:#f5f3ee;white-space:pre-wrap">${escapeHtml(message)}</div>
 </td></tr>
 </table>

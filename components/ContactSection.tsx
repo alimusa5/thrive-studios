@@ -17,15 +17,13 @@ function validate(values: Record<Field, string>) {
   if (values.name.trim().length < 2) errors.name = "Please enter your name.";
   if (!EMAIL.test(values.email.trim()))
     errors.email = "Please enter a valid email address.";
-  // Instagram is OPTIONAL on purpose: the brief asks to collect a handle, and
-  // an optional field still collects it — but requiring one locks out every
-  // creator whose audience lives on YouTube, TikTok or a newsletter. Validate
-  // it only when something was typed.
-  const handle = values.instagram.trim().replace(/^@/, "");
-  if (handle.length > 0 && handle.length < 2)
-    errors.instagram = "That handle looks too short.";
+  // Required, unlike an ordinary contact form: the handle IS the thing being
+  // audited, and it is the second follow-up channel. Without it there is no
+  // audit to send.
+  if (values.instagram.trim().replace(/^@/, "").length < 2)
+    errors.instagram = "I need your handle to review your audience.";
   if (values.message.trim().length < 10)
-    errors.message = "A sentence or two is enough — tell me where you are stuck.";
+    errors.message = "A sentence or two is enough — who follows you, and what do they ask for?";
   return errors;
 }
 
@@ -106,49 +104,62 @@ export default function ContactSection() {
             381px wide, and after its padding the side-by-side Name/Email
             inputs measured 133px each — an email address is unreadable in
             that. Stacked until 1024px, they get 292px. */}
-        <div className="grid gap-14 lg:grid-cols-12 lg:gap-x-14">
-          {/* --- Left: the ask ------------------------------------------- */}
+        <div className="grid gap-12 sm:gap-14 lg:grid-cols-12 lg:gap-x-14">
+          {/* --- Left: the offer ----------------------------------------- */}
           <div className="lg:col-span-5">
             <Reveal>
               <SectionLabel>{contact.eyebrow}</SectionLabel>
             </Reveal>
 
             <Reveal delay={80}>
-              <h2 className="mt-7 text-h1 text-bone md:mt-8">
+              <h2 className="mt-6 text-h1 text-bone sm:mt-7 md:mt-8">
                 {contact.headline}
               </h2>
             </Reveal>
 
             <Reveal delay={150}>
-              <p className="mt-7 text-lead text-ash">{contact.body}</p>
+              <p className="mt-6 text-lead text-ash sm:mt-7">{contact.body}</p>
             </Reveal>
 
             <Reveal delay={210}>
-              {/* Ordered, but with no visible numerals: the Process section
-                  already owns the big 01/02/03 device on this page, and
-                  running it twice makes the second one read as a repeat. */}
-              <ol className="mt-10 space-y-4 border-t border-line pt-8">
-                {contact.steps.map((step) => (
-                  <li key={step} className="flex gap-4">
-                    <span
-                      aria-hidden="true"
-                      className="mt-[0.55rem] h-[5px] w-[5px] shrink-0 rotate-45 bg-volt"
-                    />
-                    <span className="text-[0.9375rem] leading-[1.6] text-ash">
-                      {step}
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              {/* The deliverable, itemised. This is what the form is trading
+                  for — a named thing you receive converts far better than an
+                  invitation to get in touch. */}
+              <div className="mt-9 border-t border-line pt-8 sm:mt-10">
+                <h3 className="eyebrow">{contact.deliverablesTitle}</h3>
+                <ul className="mt-6 space-y-4">
+                  {contact.deliverables.map((item) => (
+                    <li key={item} className="flex gap-4">
+                      <span
+                        aria-hidden="true"
+                        className="mt-[0.55rem] h-[5px] w-[5px] shrink-0 rotate-45 bg-volt"
+                      />
+                      <span className="text-[0.9375rem] leading-[1.6] text-bone">
+                        {item}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-              <p className="mt-8 text-[0.9375rem] text-ash">
+              <p className="mt-8 max-w-[46ch] text-[0.9375rem] leading-[1.6] text-ash">
+                {contact.followUp}
+              </p>
+
+              {/* The one path that bypasses the form, so it has to ask for
+                  the handle itself — otherwise an emailed enquiry arrives
+                  with nothing to audit. */}
+              <p className="mt-6 text-[0.9375rem] leading-[1.6] text-ash">
                 Prefer email?{" "}
                 <a
-                  href={`mailto:${site.email}`}
-                  className="link-underline text-bone"
+                  href={`mailto:${site.email}?subject=${encodeURIComponent(
+                    "Audience audit request",
+                  )}`}
+                  className="link-underline break-words text-bone"
                 >
                   {site.email}
-                </a>
+                </a>{" "}
+                — include your handle.
               </p>
             </Reveal>
           </div>
@@ -161,7 +172,7 @@ export default function ContactSection() {
                   ref={successRef}
                   role="status"
                   tabIndex={-1}
-                  className="flex min-h-[22rem] flex-col items-start justify-center border border-line bg-graphite p-8 md:p-12"
+                  className="flex min-h-[20rem] flex-col items-start justify-center border border-line bg-graphite p-6 sm:min-h-[22rem] sm:p-8 md:p-12"
                 >
                   <span aria-hidden="true" className="h-2 w-2 rotate-45 bg-volt" />
                   <h3 className="mt-6 text-h2 text-bone">
@@ -182,7 +193,7 @@ export default function ContactSection() {
                   method="post"
                   action="/api/contact"
                   noValidate
-                  className="relative border border-line bg-graphite p-6 sm:p-8 md:p-10"
+                  className="relative border border-line bg-graphite p-5 sm:p-8 md:p-10"
                 >
                   <div className="grid gap-6 sm:grid-cols-2">
                     <TextField
@@ -215,10 +226,7 @@ export default function ContactSection() {
 
                   <div className="mt-6">
                     <label className="field-label" htmlFor={`${id}-instagram`}>
-                      Instagram handle{" "}
-                      <span className="normal-case tracking-normal text-ash/80">
-                        (optional)
-                      </span>
+                      Instagram handle
                     </label>
                     <div className="relative">
                       <span
@@ -236,15 +244,24 @@ export default function ContactSection() {
                         autoCapitalize="none"
                         spellCheck={false}
                         maxLength={80}
+                        required
                         disabled={busy}
                         value={values.instagram}
                         onChange={(e) => set("instagram")(e.target.value)}
                         aria-invalid={errors.instagram ? "true" : undefined}
                         aria-describedby={
-                          errors.instagram ? `${id}-instagram-error` : undefined
+                          errors.instagram
+                            ? `${id}-instagram-hint ${id}-instagram-error`
+                            : `${id}-instagram-hint`
                         }
                       />
                     </div>
+                    <p
+                      id={`${id}-instagram-hint`}
+                      className="mt-2 text-[0.8125rem] text-ash"
+                    >
+                      This is the account I will audit.
+                    </p>
                     <FieldError id={`${id}-instagram-error`}>
                       {errors.instagram}
                     </FieldError>
@@ -252,7 +269,7 @@ export default function ContactSection() {
 
                   <div className="mt-6">
                     <label className="field-label" htmlFor={`${id}-message`}>
-                      Your current situation
+                      About your audience
                     </label>
                     <textarea
                       id={`${id}-message`}
@@ -260,7 +277,11 @@ export default function ContactSection() {
                       rows={5}
                       maxLength={MESSAGE_MAX}
                       className="field"
-                      placeholder="Tell me about your audience, your goals, and where you're stuck..."
+                      /* Deliberately does NOT ask for niche or follower count:
+                         both are on the profile whose handle they just gave,
+                         so asking is friction that buys nothing. Ask only for
+                         what the account cannot show. */
+                      placeholder="What they keep asking you for, and anything you have already tried selling them..."
                       required
                       disabled={busy}
                       value={values.message}
@@ -277,7 +298,8 @@ export default function ContactSection() {
                       id={`${id}-message-hint`}
                       className="mt-2 text-[0.8125rem] text-ash"
                     >
-                      A sentence or two is plenty.
+                      A sentence or two is plenty — it just points me in the right
+                      direction.
                     </p>
                     <FieldError id={`${id}-message-error`}>
                       {errors.message}
@@ -311,7 +333,7 @@ export default function ContactSection() {
                   <div className="mt-8">
                     <button
                       type="submit"
-                      className="btn btn-primary"
+                      className="btn btn-primary w-full sm:w-auto"
                       disabled={busy}
                     >
                       {busy ? contact.submittingLabel : contact.submitLabel}
@@ -326,7 +348,7 @@ export default function ContactSection() {
                   </div>
 
                   <p aria-live="polite" className="sr-only">
-                    {busy ? "Sending your message." : ""}
+                    {busy ? "Sending your details." : ""}
                   </p>
 
                   {serverError ? (

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
-import { site } from "@/lib/content";
+import { hero, site } from "@/lib/content";
 
 export const alt = `${site.name} — Turn attention into assets.`;
 export const size = { width: 1200, height: 630 };
@@ -130,7 +130,7 @@ export default async function OpengraphImage() {
               marginBottom: 26,
             }}
           >
-            Shadow operator for creators
+            {hero.eyebrow}
           </div>
           <div
             style={{

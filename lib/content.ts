@@ -6,21 +6,21 @@
  * live here and are worth knowing about: the form field labels and their
  * validation messages (components/ContactSection.tsx), and the errors the
  * server shows a visitor (app/api/contact/route.ts).
- *
- * Anything marked TODO needs a real value before launch.
  */
 
 export const site = {
   name: "Thrive Studios",
-  /** Used for canonical URLs, sitemap and social cards. */
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://thrivestudios.com",
+  /**
+   * Used for canonical URLs and social cards. Assumed from the .io email
+   * address — set NEXT_PUBLIC_SITE_URL if the site lives somewhere else.
+   */
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://thrivestudios.io",
   oneLiner: "I help creators convert their audience into revenue.",
   description:
     "Thrive Studios builds the revenue infrastructure behind creators and online businesses — monetization strategy, digital products, funnels and launches, run end to end so you can keep creating.",
-  // TODO: replace with your real inbox before launch.
-  email: "hello@thrivestudios.com",
-  // TODO: replace with your real handle, or set to null to hide the link.
-  instagram: "thrivestudios",
+  email: "aonraza@thrivestudios.io",
+  /** Set to null to remove the footer link entirely. */
+  instagram: "aonraza_k",
 } as const;
 
 export const nav = [
@@ -31,24 +31,24 @@ export const nav = [
 ] as const;
 
 export const hero = {
-  eyebrow: "Shadow operator for creators",
+  eyebrow: "Growth marketer for creators",
   headline: ["Turn attention", "into assets."],
   body: "I help creators turn engaged audiences into profitable digital product businesses. From strategy to execution, I build the systems that turn attention into revenue.",
-  primaryCta: { label: "Work with Me", href: "#contact" },
+  primaryCta: { label: "Get my free audit", href: "#contact" },
   secondaryCta: { label: "See what I do", href: "#services" },
-  /** The pipeline, scrolling as a band under the fold. */
+  /** The pipeline, shown as a band on the fold line. */
   ticker: ["Audience", "Offer", "Product", "Funnel", "Launch", "Revenue"],
 } as const;
 
 export const services = {
   eyebrow: "What I Do",
-  headline: ["The systems that turn", "attention into revenue."],
+  headline: ["The business behind", "the content."],
   intro:
     "You built the audience. I build the machine behind it — so your influence becomes income without you becoming a manager.",
   items: [
     {
       title: "Monetization Strategy",
-      body: "We map the revenue already sitting in your audience: what they would pay for, what they would pay, and which offer to build first.",
+      body: "The audit shows you where the revenue is. This is the plan that goes after it — pricing, sequencing, and what to build in what order.",
     },
     {
       title: "Ideal Offer Creation",
@@ -93,14 +93,14 @@ export const howItWorks = {
 } as const;
 
 export const manifesto = {
-  quote: ["You stay the face.", "I stay the machine."],
-  body: "No agency retainer, no team to manage, no logo on your work. Just the revenue infrastructure your audience has already earned you.",
+  quote: ["You keep creating.", "I build the revenue."],
+  body: "No team to hire, no tools to learn, no second job running the back end. Just the offer, the product and the funnel — built, launched, and handed over working.",
 } as const;
 
 export const audience = {
   eyebrow: "Who This Is For",
   headline: "Micro-creators with momentum.",
-  body: "Niche micro-creators with engaged audiences who are ready to move beyond relying solely on brand deals. I help uncover the monetization opportunities already sitting within their audience and turn them into digital products and scalable revenue.",
+  body: "You have a niche audience that genuinely engages, and you are ready to stop relying on brand deals alone. I uncover the monetization opportunities already sitting within your audience and turn them into digital products and revenue that scales.",
   fit: {
     title: "This is for you if",
     items: [
@@ -115,27 +115,39 @@ export const audience = {
     items: [
       "You are still finding the niche and building the first audience.",
       "You want someone to grow the following rather than monetize it.",
-      "You want a finished product with no input on the offer behind it.",
+      "You want to hand over a brief and never discuss it again — I run the build, but the offer has to sound like you.",
     ],
   },
 } as const;
 
+/**
+ * This section is a LEAD MAGNET, not a "contact us" box. The visitor trades
+ * their handle for an audience audit, and the audit is the pitch. Keep the
+ * offer, the deliverable and the follow-up explicit — a bare "get in touch"
+ * converts far worse than a named thing you receive.
+ *
+ * The Instagram handle is REQUIRED here for the same reason: it is the thing
+ * being audited and the second contact channel, not a nice-to-have.
+ */
 export const contact = {
-  eyebrow: "Contact",
-  headline: "Ready to build? Let's talk.",
-  body: "Tell me about your audience and where you are stuck. If I can help, you get an honest read on the opportunity — not a pitch deck.",
-  steps: [
-    "You send the form — two minutes, no discovery call required.",
-    "I read it myself and reply with an honest view of the opportunity.",
-    "If it is a fit, we scope the first build and get moving.",
+  eyebrow: "Free Audience Audit",
+  headline: "See what your audience is worth.",
+  body: "Send me your handle and a little about who follows you. I will go through your audience and come back with an audit: the revenue opportunities I can see in it, and what I would build first.",
+  deliverablesTitle: "What you get back",
+  deliverables: [
+    "The offers your audience is already asking you for.",
+    "A realistic view of what each one could be worth, and what it takes to build.",
+    "Which single one to start with — and why that one.",
   ],
+  followUp:
+    "It is a short written breakdown, not a sales call. It arrives by email first; if it lands, I will follow up in your DMs and we can take it to a call from there.",
   privacy:
-    "Your details are used only to reply to this enquiry. Nothing is shared, sold, or added to a mailing list.",
-  submitLabel: "Let's Talk",
+    "Your details are used only to prepare your audit and follow it up with you. Nothing is shared, sold, or added to a mailing list.",
+  submitLabel: "Request my audit",
   submittingLabel: "Sending",
-  successTitle: "Message sent.",
+  successTitle: "Got it.",
   successBody:
-    "Thanks — I have got it. I read every message myself and will come back to you personally.",
+    "I will go through your audience and email your audit over. Worth keeping an eye on your DMs too.",
 } as const;
 
 export const footer = {

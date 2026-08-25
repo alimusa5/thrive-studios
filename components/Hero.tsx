@@ -48,17 +48,33 @@ export default function Hero() {
           </h1>
         </Reveal>
 
+        {/* Splits at lg, not md. A 5-of-12 CTA column is 257px at 768px while
+            the two buttons need 316px, so they stacked inside a narrow right
+            column — worse than simply sitting under the paragraph. Below lg
+            the row is one column with the copy held to a readable measure. */}
         <Reveal immediate delay={200}>
-          <div className="mt-11 grid gap-8 border-t border-line pt-9 md:mt-14 md:grid-cols-12 md:gap-10 md:pt-10">
-            <p className="text-lead text-ash md:col-span-6 lg:col-span-5">
+          <div className="mt-10 grid gap-8 border-t border-line pt-8 sm:mt-11 sm:pt-9 lg:mt-14 lg:grid-cols-12 lg:gap-10 lg:pt-10">
+            <p className="max-w-[54ch] text-lead text-ash lg:col-span-6">
               {hero.body}
             </p>
 
-            <div className="flex flex-wrap items-end gap-3 md:col-span-5 md:col-start-8 md:justify-end lg:col-span-4 lg:col-start-9">
-              <a href={hero.primaryCta.href} className="btn btn-primary">
+            {/* The switch is at 420px, not `sm` (640px). The two buttons need
+                315px side by side and .btn is whitespace-nowrap, so they
+                cannot shrink: below ~365px of content box they must stack. A
+                420px viewport leaves 372px, comfortably clear. Waiting for
+                `sm` would stretch a single button across 590px on a large
+                phone in landscape. */}
+            <div className="flex flex-col gap-3 min-[420px]:flex-row min-[420px]:flex-wrap min-[420px]:items-end lg:col-span-5 lg:col-start-8 lg:justify-end">
+              <a
+                href={hero.primaryCta.href}
+                className="btn btn-primary w-full min-[420px]:w-auto"
+              >
                 {hero.primaryCta.label}
               </a>
-              <a href={hero.secondaryCta.href} className="btn btn-ghost">
+              <a
+                href={hero.secondaryCta.href}
+                className="btn btn-ghost w-full min-[420px]:w-auto"
+              >
                 {hero.secondaryCta.label}
               </a>
             </div>

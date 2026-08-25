@@ -7,8 +7,12 @@ export default function SiteFooter() {
   return (
     <footer className="border-t border-line">
       <div className="shell py-16 md:py-20">
-        <div className="grid gap-12 md:grid-cols-12 md:gap-10">
-          <div className="md:col-span-5">
+        {/* Three columns only from lg. At 768px a 5/3/3 split of twelve
+            makes each side column 138px, and the email address is 172px —
+            it spilled 34px into the neighbouring gutter. Two columns at sm
+            (brand across the top, links beneath) gives it 324px. */}
+        <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-12 lg:gap-10">
+          <div className="sm:col-span-2 lg:col-span-5">
             {/* The primary stacked lockup, at a size where the STUDIOS line
                 is actually readable. `unoptimized` keeps the SVG out of the
                 image optimizer, which refuses SVG by default. */}
@@ -29,7 +33,7 @@ export default function SiteFooter() {
             </p>
           </div>
 
-          <nav aria-label="Footer" className="md:col-span-3 md:col-start-7">
+          <nav aria-label="Footer" className="lg:col-span-3 lg:col-start-7">
             <p className="eyebrow">Navigate</p>
             <ul className="mt-6 space-y-3">
               {nav.map((item) => (
@@ -45,7 +49,7 @@ export default function SiteFooter() {
             </ul>
           </nav>
 
-          <div className="md:col-span-3 md:col-start-10">
+          <div className="lg:col-span-3 lg:col-start-10">
             <p className="eyebrow">Contact</p>
             <ul className="mt-6 space-y-3">
               <li>

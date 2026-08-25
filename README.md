@@ -16,18 +16,16 @@ Then open http://localhost:3000.
 
 ## Before you go live
 
-Four things are placeholders. All four are in **`lib/content.ts`** except the
-last.
+Your contact details are in. Two things are still assumptions:
 
 | What | Where | Currently |
 | --- | --- | --- |
-| Your inbox | `lib/content.ts` → `site.email` | `hello@thrivestudios.com` |
-| Your Instagram handle | `lib/content.ts` → `site.instagram` | `thrivestudios` — set to `null` to hide the footer link |
-| Your live domain | `NEXT_PUBLIC_SITE_URL` env var | falls back to `https://thrivestudios.com` |
+| Your live domain | `NEXT_PUBLIC_SITE_URL`, or `site.url` in `lib/content.ts` | assumed `https://thrivestudios.io` from the .io email — change it if the site lives elsewhere |
 | Contact form delivery | env vars — see below | not connected; the form says so honestly |
 
 Until the form is connected it does **not** fail silently: it returns a 503 and
-the page tells the visitor to email you directly, with a working `mailto:` link.
+the page tells the visitor to email `aonraza@thrivestudios.io` directly, with a
+working `mailto:` link.
 
 ---
 
@@ -54,8 +52,8 @@ The form posts to `/api/contact`, which sends through
 
 ```bash
 RESEND_API_KEY=re_xxxxxxxx
-CONTACT_TO_EMAIL=you@yourdomain.com
-CONTACT_FROM_EMAIL="Thrive Studios <hello@yourdomain.com>"
+CONTACT_TO_EMAIL=aonraza@thrivestudios.io
+CONTACT_FROM_EMAIL="Thrive Studios <hello@thrivestudios.io>"
 ```
 
 Locally, put them in `.env.local` (copy `.env.example`). On Vercel, add them
@@ -85,20 +83,38 @@ with a `Company` label — the obvious choice — makes Chrome autofill it from 
 saved address profile, so a real person's enquiry trips the trap and is
 silently discarded. `autocomplete="off"` does not prevent this.
 
-### Two choices worth revisiting
+### Worth revisiting
 
-Both are one-line changes, called out because they are judgement calls rather
-than requirements:
-
-- **The Instagram handle is optional.** The brief asked to collect it, and an
-  optional field still collects it — but requiring one turns away every creator
-  whose audience is on YouTube, TikTok, or a newsletter. To make it required,
-  drop the `handle.length > 0 &&` guard in `validate()` in
-  `components/ContactSection.tsx` and re-add the check in the API route.
+- **The Instagram handle is required.** It is the account being audited and
+  your second follow-up channel, so a submission without one is not actionable.
+  The trade-off is real though: a creator whose audience lives on YouTube,
+  TikTok or a newsletter cannot submit at all. To relax it, add a
+  `handle.length > 0 &&` guard to the instagram check in `validate()`
+  (`components/ContactSection.tsx`) and drop the matching check in
+  `app/api/contact/route.ts`.
 - **There is no reply-time promise.** An earlier draft said "within two
   business days" — that is a commitment only you can make, so it was removed
   rather than invented on your behalf. If you want one, it belongs in
-  `contact.steps` and `contact.successBody` in `lib/content.ts`.
+  `contact.followUp` and `contact.successBody` in `lib/content.ts`.
+
+---
+
+## The contact section is a lead magnet
+
+It is not a "get in touch" box, and the copy is built around that. The visitor
+trades four details for a **free audience audit**, and the audit is the pitch:
+you review their account, send it by email, follow up in their DMs, and take it
+to a call from there. `lib/content.ts` → `contact` carries the offer
+(`headline`, `body`), the deliverable (`deliverables`) and the follow-up
+sequence (`followUp`).
+
+That framing is why the **Instagram handle is required** — it is the thing being
+audited — and why the submit button says "Send me my audit" rather than "Send".
+An enquiry arrives in your inbox titled *Audit request — Name (@handle)*, with
+the handle as a clickable link and Reply-To set to the sender.
+
+If you ever change what you send them, change `deliverables` — three concrete
+bullets is what makes the form worth filling in.
 
 ---
 
