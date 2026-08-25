@@ -22,6 +22,7 @@ Your contact details are in. Two things are still assumptions:
 | --- | --- | --- |
 | Your live domain | `NEXT_PUBLIC_SITE_URL`, or `site.url` in `lib/content.ts` | assumed `https://thrivestudios.io` from the .io email — change it if the site lives elsewhere |
 | Contact form delivery | env vars — see below | not connected; the form says so honestly |
+| Lead storage | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | not connected; enquiries arrive by email only |
 
 Until the form is connected it does **not** fail silently: it returns a 503 and
 the page tells the visitor to email `aonraza@thrivestudios.io` directly, with a
@@ -118,12 +119,77 @@ bullets is what makes the form worth filling in.
 
 ---
 
+## Lead storage (Supabase)
+
+The form emails you **and** writes a row to Supabase, so an email outage or an
+archived inbox cannot lose a lead. It is optional — with the Supabase vars
+unset the site still takes enquiries by email and logs a warning on each one.
+
+**Setup, once:**
+
+1. Create a Supabase project.
+2. Open **SQL Editor → New query**, paste [`supabase/schema.sql`](supabase/schema.sql), Run.
+3. Copy **Project URL** (Settings → Data API) and the **`service_role`** key
+   (Settings → API keys) into `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+
+You read the leads in the Supabase **Table Editor**. There is no admin page in
+the app and deliberately so — one less surface to secure.
+
+⚠️ **The `service_role` key bypasses Row Level Security.** Never prefix it
+`NEXT_PUBLIC_`, never import `lib/leads.ts` into a client component. Anything
+`NEXT_PUBLIC_` is compiled into the browser bundle, and that key would let
+anyone read every lead.
+
+⚠️ **The table has RLS enabled with no policies, which is deny-all — and that
+is correct, not an oversight.** The anon key is public; this table holds
+strangers' names, emails and what they told you about their business. The
+service-role key used by the route bypasses RLS, so inserts still work. Do not
+add a policy "so I can read it from the browser".
+
+**How it fails.** The row is written *before* the email, and nothing downstream
+branches on the result:
+
+| What breaks | What happens |
+| --- | --- |
+| Supabase down | Email still sends. Logged as `Lead was NOT stored`. |
+| Resend down | Row is already saved. Visitor is told to email you directly. |
+| Both | Visitor gets the `mailto:` fallback, which is why it is on the page. |
+
+The status column tracks your funnel: `new → audit_sent → dm_sent →
+call_booked → client` (or `declined`). It is a CHECK constraint, so a typo is
+rejected at insert rather than becoming a silent new bucket — **widen the CHECK
+in the schema if you add a status.**
+
+---
+
 ## Deploying
 
-Push to GitHub, then import the repo at [vercel.com/new](https://vercel.com/new).
-Framework detection, build command and output are all automatic. Add the
-environment variables above before the first deploy if you want the form live
-immediately.
+**1. Resend** — create the account, add `thrivestudios.io` as a domain, add the
+DNS records it gives you at your registrar, then create an API key. You only
+need *sending*; the site never receives email. Until the domain verifies, ship
+with `Thrive Studios <onboarding@resend.dev>` as the sender.
+
+⚠️ If that domain already handles your mail, **merge** Resend's SPF record into
+your existing one rather than adding a second `v=spf1` TXT record — two SPF
+records on one domain is invalid and can break your own inbox.
+
+**2. Vercel** — import the repo at [vercel.com/new](https://vercel.com/new).
+Framework, build command and output all auto-detect. Add every variable from
+`.env.example` under **Settings → Environment Variables** before the first
+deploy.
+
+**3. Domain** — add it in Vercel and follow their DNS instructions. Vercel's
+records (A / CNAME) and Resend's (TXT / DKIM) are different record types and
+coexist fine at the same registrar.
+
+**4. Check it end to end** — submit the form as a visitor would. You should get
+an email titled *Audit request — Name (@handle)* with Reply-To set to them, and
+a matching row in the Supabase Table Editor.
+
+⚠️ **`NEXT_PUBLIC_SITE_URL` is inlined at build time.** Add or change it after
+deploying and you must **redeploy**, or your canonical URL and social-card links
+keep pointing at the old value. The other variables are read per request and
+take effect immediately.
 
 ---
 

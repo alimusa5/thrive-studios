@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { contact, site } from "@/lib/content";
+import { saveLead } from "@/lib/leads";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -170,6 +171,24 @@ export async function POST(request: Request) {
 
   // Valid and about to be sent — now it counts against the window.
   recordAttempt(ip);
+
+  // Persist BEFORE emailing, and never let the result change the response.
+  // Order matters: writing first means an email outage cannot lose the lead,
+  // because the row already exists. The reverse — a database outage — cannot
+  // cost the email either, because nothing below branches on `saved`.
+  const saved = await saveLead({ name, email, instagram, message });
+  if (saved === "failed") {
+    console.error(
+      "[contact] Lead was NOT stored; the email below is the only copy.",
+    );
+  } else if (saved === "unconfigured") {
+    // Warn per submission rather than once per cold start. At this site's
+    // volume that is a handful of lines a day, and "leads are not being
+    // stored" is exactly the condition you want noisy rather than tidy.
+    console.warn(
+      "[contact] Supabase is not configured; the email is the only copy of this lead.",
+    );
+  }
 
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.CONTACT_FROM_EMAIL;
