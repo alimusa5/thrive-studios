@@ -279,7 +279,11 @@
     border-color: var(--color-field-line-hover);
   }
   .field:focus {
-    outline: none;
+    /* NO `outline: none` here. This rule lives in @layer components, which
+       outranks the base :focus-visible ring — and `.field[aria-invalid]`
+       below re-takes border-color at equal specificity, so suppressing the
+       outline left a focused invalid field with no focus indicator at all.
+       That is exactly the state onSubmit puts a keyboard user into. */
     border-color: var(--color-volt);
     background-color: #0e1117;
   }

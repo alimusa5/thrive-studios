@@ -18,9 +18,26 @@ const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 5;
 const hits = new Map<string, number[]>();
 
-function rateLimited(key: string): boolean {
-  const now = Date.now();
+function recentHits(key: string, now: number): number[] {
   const recent = (hits.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
+  hits.set(key, recent);
+  return recent;
+}
+
+/** Peek. Does NOT count the attempt — see recordAttempt. */
+function overLimit(key: string): boolean {
+  return recentHits(key, Date.now()).length >= MAX_PER_WINDOW;
+}
+
+/**
+ * Counts one attempt. Called only once a submission has passed validation and
+ * is about to be sent: counting rejected submissions instead meant someone
+ * fixing two typos spent three of their five attempts and got locked out of
+ * the form mid-correction.
+ */
+function recordAttempt(key: string): void {
+  const now = Date.now();
+  const recent = recentHits(key, now);
   recent.push(now);
   hits.set(key, recent);
 
@@ -30,7 +47,23 @@ function rateLimited(key: string): boolean {
       if (times.every((t) => now - t >= WINDOW_MS)) hits.delete(k);
     }
   }
-  return recent.length > MAX_PER_WINDOW;
+}
+
+/**
+ * People paste a profile URL as often as they type a handle, and the field's
+ * decorative "@" prefix does not stop them. Left alone,
+ * "https://instagram.com/name" survived every check and produced the subject
+ * "(@https://instagram.com/name)" and a doubly-nested dead link.
+ * Normalising beats rejecting here: a 422 turns a salvageable lead away.
+ */
+function normalizeHandle(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/^instagram\.com\//i, "")
+    .replace(/[/?#].*$/, "")
+    .replace(/^@/, "");
 }
 
 function clamp(value: unknown, max: number): string {
@@ -67,7 +100,7 @@ function htmlReply(status: number, heading: string, body: string) {
 <div style="width:8px;height:8px;background:#c6ff4d;transform:rotate(45deg)"></div>
 <h1 style="margin:1.5rem 0 0;font-size:2rem;font-weight:600;letter-spacing:-.02em">${escapeHtml(heading)}</h1>
 <p style="margin:1rem 0 2rem;font-size:1rem;line-height:1.65;color:#8b8d94">${escapeHtml(body)}</p>
-<a href="/" style="display:inline-block;padding:.875rem 1.75rem;background:#c6ff4d;color:#0b0d12;font-weight:600;text-decoration:none;border-radius:2px">Back to ${escapeHtml(site.name)}</a>
+<a href="/#contact" style="display:inline-block;padding:.875rem 1.75rem;background:#c6ff4d;color:#0b0d12;font-weight:600;text-decoration:none;border-radius:2px">Back to the form</a>
 </main></body></html>`,
     { status, headers: { "content-type": "text/html; charset=utf-8" } },
   );
@@ -110,13 +143,13 @@ export async function POST(request: Request) {
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip") ||
     "unknown";
-  if (rateLimited(ip)) {
+  if (overLimit(ip)) {
     return reject(429, "That is a few messages in quick succession — try again in a minute.");
   }
 
   const name = clamp(body.name, LIMITS.name);
   const email = clamp(body.email, LIMITS.email);
-  const instagram = clamp(body.instagram, LIMITS.instagram).replace(/^@/, "");
+  const instagram = normalizeHandle(clamp(body.instagram, LIMITS.instagram));
   const rawMessage = typeof body.message === "string" ? body.message.trim() : "";
 
   // Re-validated server side: the client checks are for the person filling
@@ -134,6 +167,9 @@ export async function POST(request: Request) {
     return reject(422, `That message is a little long — please keep it under ${LIMITS.message} characters.`);
   }
   const message = rawMessage;
+
+  // Valid and about to be sent — now it counts against the window.
+  recordAttempt(ip);
 
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.CONTACT_FROM_EMAIL;

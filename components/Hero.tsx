@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import DisplayLines from "./DisplayLines";
 import Reveal from "./Reveal";
 import { hero } from "@/lib/content";
@@ -7,7 +6,9 @@ function Diamond() {
   return (
     <span
       aria-hidden="true"
-      className="block h-[5px] w-[5px] shrink-0 rotate-45 bg-volt"
+      /* Hidden while the band wraps: on a phone a separator would lead
+         each wrapped line. Already aria-hidden, so nothing is lost. */
+      className="hidden h-[5px] w-[5px] shrink-0 rotate-45 bg-volt sm:block"
     />
   );
 }
@@ -21,7 +22,7 @@ export default function Hero() {
          its own bottom edge off screen — measured at 1440x900, the band below
          sat at y=930 against a 900px fold, i.e. invisible at load. Subtract
          the bar's height (h-16 / sm:h-20) plus its 1px bottom border. */
-      className="relative flex min-h-[calc(100svh-4rem-1px)] flex-col justify-between overflow-hidden pt-24 sm:min-h-[calc(100svh-5rem-1px)] md:pt-28"
+      className="relative flex min-h-[calc(100svh-4rem-1px)] flex-col justify-between overflow-hidden pt-14 sm:min-h-[calc(100svh-5rem-1px)] sm:pt-20 md:pt-28"
     >
       {/* A single soft bloom behind the headline. Radial gradient rather than a
           blurred block — same result, a fraction of the paint cost. */}
@@ -34,10 +35,13 @@ export default function Hero() {
         }}
       />
 
-      <div className="shell relative z-10 flex flex-1 flex-col justify-center py-14">
+      <div className="shell relative z-10 flex flex-1 flex-col justify-center py-8 sm:py-14">
         <Reveal immediate>
           <p className="eyebrow flex items-center gap-4">
-            <span aria-hidden="true" className="block h-px w-10 bg-volt" />
+            <span
+              aria-hidden="true"
+              className="block h-px w-10 shrink-0 bg-volt"
+            />
             {hero.eyebrow}
           </p>
         </Reveal>
@@ -95,10 +99,15 @@ export default function Hero() {
       <div className="relative z-10 border-y border-line">
         <div className="shell flex flex-wrap items-center justify-center gap-x-5 gap-y-3 py-4 sm:gap-x-8">
           {hero.ticker.map((word, i) => (
-            <Fragment key={word}>
+            /* Diamond and word wrap as ONE item. As siblings, a wrap could
+               land the separator alone at the start of the next line. */
+            <span
+              key={word}
+              className="flex items-center gap-x-5 whitespace-nowrap sm:gap-x-8"
+            >
               {i > 0 ? <Diamond /> : null}
-              <span className="eyebrow whitespace-nowrap">{word}</span>
-            </Fragment>
+              <span className="eyebrow">{word}</span>
+            </span>
           ))}
         </div>
       </div>

@@ -69,7 +69,7 @@ export default function Audience() {
           </Reveal>
 
           <Reveal delay={160}>
-            <p className="mx-auto mt-7 max-w-3xl text-lead text-ash md:mt-8">
+            <p className="mx-auto mt-7 max-w-[62ch] text-lead text-ash md:mt-8">
               {audience.body}
             </p>
           </Reveal>

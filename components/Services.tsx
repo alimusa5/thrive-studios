@@ -27,14 +27,16 @@ export default function Services() {
           <SectionLabel>{services.eyebrow}</SectionLabel>
         </Reveal>
 
-        <div className="mt-7 grid gap-7 md:mt-8 md:grid-cols-12 md:gap-10">
-          <Reveal className="md:col-span-7">
+        {/* Splits at lg. A 5-of-12 column is 257px at 768px, which sets the
+            intro at roughly 32 characters a line. */}
+        <div className="mt-7 grid gap-7 md:mt-8 lg:grid-cols-12 lg:gap-10">
+          <Reveal className="lg:col-span-6">
             <h2 className="text-h1 text-bone">
               <DisplayLines lines={services.headline} />
             </h2>
           </Reveal>
 
-          <Reveal delay={120} className="md:col-span-5 md:self-end">
+          <Reveal delay={120} className="lg:col-span-6 lg:self-end">
             <p className="text-lead text-ash">{services.intro}</p>
           </Reveal>
         </div>

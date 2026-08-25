@@ -19,11 +19,13 @@ export default function Process() {
 
         {/* No x-gap on desktop so the three top rules read as one continuous
             line, with a node marking each step. */}
-        <ol className="mt-14 grid gap-14 md:mt-20 md:grid-cols-3 md:gap-x-0 md:gap-y-0">
+        {/* 3-up only from lg: at 768 three columns leave each step a ~184px
+            measure, tighter than the same text gets on a phone. */}
+        <ol className="mt-14 grid gap-14 md:mt-20 lg:grid-cols-3 lg:gap-x-0 lg:gap-y-0">
           {howItWorks.steps.map((step, i) => (
             <li
               key={step.title}
-              className="relative border-t border-line pt-8 md:pr-10 md:last:pr-0"
+              className="relative border-t border-line pt-8 lg:pr-10 lg:last:pr-0"
             >
               <span
                 aria-hidden="true"

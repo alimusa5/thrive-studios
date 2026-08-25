@@ -39,11 +39,16 @@ export default function ContactSection() {
     message: "",
   });
   const successRef = useRef<HTMLDivElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
 
-  // On success the form unmounts and focus would fall to <body>, leaving a
-  // keyboard or screen-reader user with no idea anything happened.
+  // Every field and the button carry disabled={busy}, and disabling the
+  // focused element blurs it to <body>. So BOTH terminal states have to put
+  // focus somewhere: on success the form has unmounted, and on error the
+  // keyboard user would otherwise be at the top of the document, tabbing back
+  // through the header and all four fields to reach the retry button.
   useEffect(() => {
     if (status === "success") successRef.current?.focus();
+    else if (status === "error") errorRef.current?.focus();
   }, [status]);
 
   const set = (field: Field) => (value: string) => {
@@ -100,13 +105,15 @@ export default function ContactSection() {
   return (
     <section id="contact" className="section border-t border-line">
       <div className="shell">
-        {/* Splits at lg, not md. At 768px a 5/7 split leaves the form block
-            381px wide, and after its padding the side-by-side Name/Email
-            inputs measured 133px each — an email address is unreadable in
-            that. Stacked until 1024px, they get 292px. */}
+        {/* Three blocks with EXPLICIT grid placement, so the DOM order and the
+            desktop layout can differ. Read top to bottom on a phone that is
+            pitch → form → detail; with the detail block above the form the
+            first CTA sat roughly 950px above the field it promised. On desktop
+            the pitch and detail stack in the left column and the form spans
+            both rows beside them. */}
         <div className="grid gap-12 sm:gap-14 lg:grid-cols-12 lg:gap-x-14">
-          {/* --- Left: the offer ----------------------------------------- */}
-          <div className="lg:col-span-5">
+          {/* --- The offer: reason to fill it in ------------------------- */}
+          <div className="lg:col-span-5 lg:col-start-1 lg:row-start-1">
             <Reveal>
               <SectionLabel>{contact.eyebrow}</SectionLabel>
             </Reveal>
@@ -118,54 +125,14 @@ export default function ContactSection() {
             </Reveal>
 
             <Reveal delay={150}>
-              <p className="mt-6 text-lead text-ash sm:mt-7">{contact.body}</p>
-            </Reveal>
-
-            <Reveal delay={210}>
-              {/* The deliverable, itemised. This is what the form is trading
-                  for — a named thing you receive converts far better than an
-                  invitation to get in touch. */}
-              <div className="mt-9 border-t border-line pt-8 sm:mt-10">
-                <h3 className="eyebrow">{contact.deliverablesTitle}</h3>
-                <ul className="mt-6 space-y-4">
-                  {contact.deliverables.map((item) => (
-                    <li key={item} className="flex gap-4">
-                      <span
-                        aria-hidden="true"
-                        className="mt-[0.55rem] h-[5px] w-[5px] shrink-0 rotate-45 bg-volt"
-                      />
-                      <span className="text-[0.9375rem] leading-[1.6] text-bone">
-                        {item}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <p className="mt-8 max-w-[46ch] text-[0.9375rem] leading-[1.6] text-ash">
-                {contact.followUp}
-              </p>
-
-              {/* The one path that bypasses the form, so it has to ask for
-                  the handle itself — otherwise an emailed enquiry arrives
-                  with nothing to audit. */}
-              <p className="mt-6 text-[0.9375rem] leading-[1.6] text-ash">
-                Prefer email?{" "}
-                <a
-                  href={`mailto:${site.email}?subject=${encodeURIComponent(
-                    "Audience audit request",
-                  )}`}
-                  className="link-underline break-words text-bone"
-                >
-                  {site.email}
-                </a>{" "}
-                — include your handle.
+              <p className="mt-6 max-w-[58ch] text-lead text-ash sm:mt-7">
+                {contact.body}
               </p>
             </Reveal>
           </div>
 
-          {/* --- Right: the form ----------------------------------------- */}
-          <div className="lg:col-span-7">
+          {/* --- The form ----------------------------------------------- */}
+          <div className="lg:col-span-7 lg:col-start-6 lg:row-span-2 lg:row-start-1 lg:self-start">
             <Reveal delay={120}>
               {status === "success" ? (
                 <div
@@ -193,9 +160,12 @@ export default function ContactSection() {
                   method="post"
                   action="/api/contact"
                   noValidate
-                  className="relative border border-line bg-graphite p-5 sm:p-8 md:p-10"
+                  className="@container relative border border-line bg-graphite p-5 sm:p-8 md:p-10"
                 >
-                  <div className="grid gap-6 sm:grid-cols-2">
+                  {/* @lg = 512px of FORM width, not viewport. Keyed to the
+                      viewport these went two-up the moment the section split
+                      at lg, dropping each field from ~418px to ~210px. */}
+                  <div className="grid gap-6 @lg:grid-cols-2">
                     <TextField
                       id={`${id}-name`}
                       name="name"
@@ -353,8 +323,10 @@ export default function ContactSection() {
 
                   {serverError ? (
                     <p
+                      ref={errorRef}
+                      tabIndex={-1}
                       role="alert"
-                      className="mt-6 border-l-2 border-[#f87171] bg-[#f87171]/5 px-4 py-3 text-[0.875rem] text-bone"
+                      className="mt-6 border-l-2 border-[#f87171] bg-[#f87171]/5 px-4 py-3 text-[0.875rem] text-bone outline-none"
                     >
                       {serverError}{" "}
                       <a
@@ -368,6 +340,51 @@ export default function ContactSection() {
                   ) : null}
                 </form>
               )}
+            </Reveal>
+          </div>
+
+          {/* --- What you get back, and what happens next ---------------- */}
+          <div className="lg:col-span-5 lg:col-start-1 lg:row-start-2">
+            <Reveal delay={210}>
+              {/* The deliverable, itemised. This is what the form is trading
+                  for — a named thing you receive converts far better than an
+                  invitation to get in touch. */}
+              <div className="border-t border-line pt-8">
+                <h3 className="eyebrow">{contact.deliverablesTitle}</h3>
+                <ul className="mt-6 space-y-4">
+                  {contact.deliverables.map((item) => (
+                    <li key={item} className="flex gap-4">
+                      <span
+                        aria-hidden="true"
+                        className="mt-[0.55rem] h-[5px] w-[5px] shrink-0 rotate-45 bg-volt"
+                      />
+                      <span className="text-[0.9375rem] leading-[1.6] text-bone">
+                        {item}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <p className="mt-8 max-w-[46ch] text-[0.9375rem] leading-[1.6] text-ash">
+                {contact.followUp}
+              </p>
+
+              {/* The one path that bypasses the form, so it has to ask for
+                  what the audit needs — otherwise an emailed enquiry arrives
+                  with nothing to work from. */}
+              <p className="mt-6 text-[0.9375rem] leading-[1.6] text-ash">
+                Prefer email?{" "}
+                <a
+                  href={`mailto:${site.email}?subject=${encodeURIComponent(
+                    "Audience audit request",
+                  )}`}
+                  className="link-underline break-words text-bone"
+                >
+                  {site.email}
+                </a>{" "}
+                — include your handle and a line about your audience.
+              </p>
             </Reveal>
           </div>
         </div>
