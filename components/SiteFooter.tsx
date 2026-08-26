@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { footer, nav, site } from "@/lib/content";
+import { InstagramIcon, MailIcon } from "./icons";
 
 export default function SiteFooter() {
   const year = new Date().getFullYear();
@@ -51,13 +52,20 @@ export default function SiteFooter() {
 
           <div className="lg:col-span-3 lg:col-start-10">
             <p className="eyebrow">Contact</p>
+            {/* `link-underline` sits on the inner span, not the anchor: it is
+                width:100% of its own element, so on the anchor it would draw
+                under the icon as well. The `.group:hover` rule in globals.css
+                is what keeps the whole link driving it. */}
             <ul className="mt-6 space-y-3">
               <li>
                 <a
                   href={`mailto:${site.email}`}
-                  className="tap-y link-underline text-[0.9375rem] text-ash transition-colors duration-[180ms] ease-out hover:text-bone"
+                  className="tap-y group flex items-center gap-2.5 text-[0.9375rem] text-ash transition-colors duration-[180ms] ease-out hover:text-bone"
                 >
-                  {site.email}
+                  <MailIcon className="h-4 w-4 shrink-0 transition-colors duration-[180ms] ease-out group-hover:text-volt" />
+                  <span className="link-underline break-words">
+                    {site.email}
+                  </span>
                 </a>
               </li>
               {site.instagram ? (
@@ -66,9 +74,11 @@ export default function SiteFooter() {
                     href={`https://instagram.com/${site.instagram}`}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="tap-y link-underline text-[0.9375rem] text-ash transition-colors duration-[180ms] ease-out hover:text-bone"
+                    className="tap-y group flex items-center gap-2.5 text-[0.9375rem] text-ash transition-colors duration-[180ms] ease-out hover:text-bone"
                   >
-                    @{site.instagram}
+                    <InstagramIcon className="h-4 w-4 shrink-0 transition-colors duration-[180ms] ease-out group-hover:text-volt" />
+                    <span className="link-underline">@{site.instagram}</span>
+                    <span className="sr-only">(opens in a new tab)</span>
                   </a>
                 </li>
               ) : null}

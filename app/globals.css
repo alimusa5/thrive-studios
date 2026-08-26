@@ -314,7 +314,13 @@
     transform-origin: right;
     transition: transform var(--duration-base) var(--ease-out);
   }
-  .link-underline:hover::after {
+  .link-underline:hover::after,
+  /* Lets the rule live on an inner span while the whole link drives it. The
+     underline is width:100% of its own element, so on a link that also holds
+     an icon it has to sit on the TEXT — otherwise it draws under the icon
+     too. Without this, hovering the icon would change colour but not
+     underline. */
+  .group:hover .link-underline::after {
     transform: scaleX(1);
     transform-origin: left;
   }
