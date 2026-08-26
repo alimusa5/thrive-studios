@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import Reveal from "./Reveal";
 import SectionLabel from "./SectionLabel";
+import { InstagramIcon, MailIcon } from "./icons";
 import { contact, site } from "@/lib/content";
 
 type Status = "idle" | "submitting" | "success" | "error";
@@ -370,21 +371,46 @@ export default function ContactSection() {
                 {contact.followUp}
               </p>
 
-              {/* The one path that bypasses the form, so it has to ask for
-                  what the audit needs — otherwise an emailed enquiry arrives
-                  with nothing to work from. */}
-              <p className="mt-6 text-[0.9375rem] leading-[1.6] text-ash">
-                Prefer email?{" "}
-                <a
-                  href={`mailto:${site.email}?subject=${encodeURIComponent(
-                    "Audience audit request",
-                  )}`}
-                  className="link-underline break-words text-bone"
-                >
-                  {site.email}
-                </a>{" "}
-                — include your handle and a line about your audience.
-              </p>
+              {/* The two paths that bypass the form. They have to carry the
+                  ask themselves — an enquiry that arrives here has none of the
+                  fields the audit needs. */}
+              <div className="mt-8 border-t border-line pt-7">
+                <h3 className="eyebrow">Or reach me directly</h3>
+
+                <ul className="mt-5 space-y-1">
+                  <li>
+                    <a
+                      href={`mailto:${site.email}?subject=${encodeURIComponent(
+                        "Audience audit request",
+                      )}`}
+                      className="group -mx-2 flex items-center gap-3 rounded-sm px-2 py-2 text-[0.9375rem] text-ash transition-colors duration-[180ms] ease-out hover:text-bone"
+                    >
+                      <MailIcon className="h-[18px] w-[18px] shrink-0 text-ash transition-colors duration-[180ms] ease-out group-hover:text-volt" />
+                      <span className="break-words">{site.email}</span>
+                    </a>
+                  </li>
+
+                  {site.instagram ? (
+                    <li>
+                      <a
+                        href={`https://instagram.com/${site.instagram}`}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="group -mx-2 flex items-center gap-3 rounded-sm px-2 py-2 text-[0.9375rem] text-ash transition-colors duration-[180ms] ease-out hover:text-bone"
+                      >
+                        <InstagramIcon className="h-[18px] w-[18px] shrink-0 text-ash transition-colors duration-[180ms] ease-out group-hover:text-volt" />
+                        <span>@{site.instagram}</span>
+                        <span className="sr-only">(opens in a new tab)</span>
+                      </a>
+                    </li>
+                  ) : null}
+                </ul>
+
+                <p className="mt-4 max-w-[46ch] text-[0.8125rem] leading-[1.6] text-ash">
+                  Either way, include your handle and a line about your audience
+                  so I have something to work from.
+                </p>
+              </div>
             </Reveal>
           </div>
         </div>

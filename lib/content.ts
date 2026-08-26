@@ -18,7 +18,7 @@ export const site = {
   oneLiner: "I help creators convert their audience into revenue.",
   description:
     "Thrive Studios builds the revenue infrastructure behind creators and online businesses — monetization strategy, digital products, funnels and launches, run end to end so you can keep creating.",
-  email: "aonraza@thrivestudios.io",
+  email: "contact@thrivestudios.io",
   /** Set to null to remove the footer link entirely. */
   instagram: "aonraza_k",
 } as const;

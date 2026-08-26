@@ -27,7 +27,7 @@ Set both up — but note the form keeps working on either one alone, so you can
 ship with one configured and add the other later.
 
 With neither connected the form does **not** fail silently: it returns a 503
-and tells the visitor to email `aonraza@thrivestudios.io` instead.
+and tells the visitor to email `contact@thrivestudios.io` instead.
 
 ---
 
